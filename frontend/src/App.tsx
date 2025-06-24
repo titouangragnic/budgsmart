@@ -1,17 +1,34 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
+interface Transaction {
+  id: number
+  description: string
+  amount: number
+  type: 'expense' | 'income'
+  category: string
+  date: string
+}
+
+interface FormData {
+  description: string
+  amount: string
+  type: 'expense' | 'income'
+  category: string
+  date: string
+}
+
 function App() {
-  const [transactions, setTransactions] = useState([])
-  const [formData, setFormData] = useState({
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [formData, setFormData] = useState<FormData>({
     description: '',
     amount: '',
     type: 'expense',
     category: '',
     date: new Date().toISOString().split('T')[0]
   })
-  const [editingId, setEditingId] = useState(null)
-  const [filter, setFilter] = useState('all')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [filter, setFilter] = useState<'all' | 'expense' | 'income'>('all')
 
   // Charger les transactions depuis localStorage
   useEffect(() => {
@@ -31,7 +48,7 @@ function App() {
     'Santé', 'Éducation', 'Shopping', 'Utilities', 'Autre'
   ]
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -39,14 +56,14 @@ function App() {
     }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.description || !formData.amount || !formData.category) {
       alert('Veuillez remplir tous les champs')
       return
     }
 
-    const transaction = {
+    const transaction: Transaction = {
       id: editingId || Date.now(),
       ...formData,
       amount: parseFloat(formData.amount)
@@ -68,7 +85,7 @@ function App() {
     })
   }
 
-  const handleEdit = (transaction) => {
+  const handleEdit = (transaction: Transaction) => {
     setFormData({
       description: transaction.description,
       amount: transaction.amount.toString(),
@@ -79,7 +96,7 @@ function App() {
     setEditingId(transaction.id)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) {
       setTransactions(prev => prev.filter(t => t.id !== id))
     }
@@ -253,7 +270,7 @@ function App() {
               <p className="no-transactions">Aucune transaction trouvée</p>
             ) : (
               filteredTransactions
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .map(transaction => (
                   <div key={transaction.id} className="transaction-card">
                     <div className="transaction-info">
