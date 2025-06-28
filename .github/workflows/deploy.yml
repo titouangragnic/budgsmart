@@ -12,14 +12,14 @@ jobs:
   build:
     name: Build Frontend dans Docker
     runs-on: ubuntu-latest
-    env:
-      VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
       - name: Build dans un conteneur Node avec VITE_API_URL
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           docker run --rm \
             -e VITE_API_URL \
