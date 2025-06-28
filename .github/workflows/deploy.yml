@@ -12,7 +12,8 @@ jobs:
   build:
     name: Build Frontend dans Docker
     runs-on: ubuntu-latest
-
+    environment: github-pages
+    
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
