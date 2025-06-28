@@ -1,4 +1,4 @@
-import './Header.css'
+import styles from './Header.module.css'
 
 interface HeaderProps {
   title: string
@@ -7,7 +7,7 @@ interface HeaderProps {
 
 const Header = ({ title, subtitle }: HeaderProps) => {
   return (
-    <header className="header">
+    <header className={styles.header}>
       <h1>{title}</h1>
       <p>{subtitle}</p>
     </header>

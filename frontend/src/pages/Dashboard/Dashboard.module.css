@@ -1,9 +1,9 @@
 .dashboard {
   min-height: 100vh;
-  background-color: #f9fafb;
+  background-color: var(--bg-color);
 }
 
-.main-content {
+.mainContent {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1rem 2rem 1rem;
@@ -13,7 +13,7 @@
 }
 
 @media (max-width: 1024px) {
-  .main-content {
+  .mainContent {
     grid-template-columns: 1fr;
   }
 }

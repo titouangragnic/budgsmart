@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useTransactions } from '../hooks/useTransactions'
-import Header from '../components/Header'
-import Summary from '../components/Summary'
-import TransactionForm from '../components/TransactionForm'
-import TransactionList from '../components/TransactionList'
-import { Transaction, FormData } from '../types/Transaction'
-import './Dashboard.css'
+import { useTransactions } from '../../hooks/useTransactions'
+import Header from '../../components/Header'
+import Summary from '../../components/Summary'
+import TransactionForm from '../../components/TransactionForm'
+import TransactionList from '../../components/TransactionList'
+import { Transaction, FormData } from '../../types/Transaction'
+import styles from './Dashboard.module.css'
 
 const Dashboard = () => {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, getBalance } = useTransactions()
@@ -38,7 +38,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="dashboard">
+    <div className={styles.dashboard}>
       <Header 
         title="💰 BudgSmart" 
         subtitle="Gérez votre budget personnel" 
@@ -50,7 +50,7 @@ const Dashboard = () => {
         balance={balance}
       />
 
-      <div className="main-content">
+      <div className={styles.mainContent}>
         <TransactionForm 
           onSubmit={handleSubmit}
           editingTransaction={editingTransaction}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Transaction, FilterType } from '../types/Transaction'
-import './TransactionList.css'
+import { Transaction, FilterType } from '../../types/Transaction'
+import styles from './TransactionList.module.css'
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -17,24 +17,24 @@ const TransactionList = ({ transactions, onEdit, onDelete }: TransactionListProp
   })
 
   return (
-    <div className="transactions-section">
-      <div className="transactions-header">
+    <div className={styles.transactionsSection}>
+      <div className={styles.transactionsHeader}>
         <h2>Transactions ({filteredTransactions.length})</h2>
-        <div className="filter-buttons">
+        <div className={styles.filterButtons}>
           <button 
-            className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+            className={`${styles.filterBtn} ${filter === 'all' ? styles.active : ''}`}
             onClick={() => setFilter('all')}
           >
             Toutes
           </button>
           <button 
-            className={`filter-btn ${filter === 'income' ? 'active' : ''}`}
+            className={`${styles.filterBtn} ${filter === 'income' ? styles.active : ''}`}
             onClick={() => setFilter('income')}
           >
             Revenus
           </button>
           <button 
-            className={`filter-btn ${filter === 'expense' ? 'active' : ''}`}
+            className={`${styles.filterBtn} ${filter === 'expense' ? styles.active : ''}`}
             onClick={() => setFilter('expense')}
           >
             Dépenses
@@ -42,40 +42,40 @@ const TransactionList = ({ transactions, onEdit, onDelete }: TransactionListProp
         </div>
       </div>
 
-      <div className="transactions-list">
+      <div className={styles.transactionsList}>
         {filteredTransactions.length === 0 ? (
-          <p className="no-transactions">Aucune transaction trouvée</p>
+          <p className={styles.noTransactions}>Aucune transaction trouvée</p>
         ) : (
           filteredTransactions
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .map(transaction => (
-              <div key={transaction.id} className="transaction-card">
-                <div className="transaction-info">
-                  <div className="transaction-main">
+              <div key={transaction.id} className={styles.transactionCard}>
+                <div className={styles.transactionInfo}>
+                  <div className={styles.transactionMain}>
                     <h4>{transaction.description}</h4>
-                    <p className="transaction-category">{transaction.category}</p>
+                    <p className={styles.transactionCategory}>{transaction.category}</p>
                   </div>
-                  <div className="transaction-details">
-                    <p className={`transaction-amount ${transaction.type}`}>
+                  <div className={styles.transactionDetails}>
+                    <p className={`${styles.transactionAmount} ${styles[transaction.type]}`}>
                       {transaction.type === 'expense' ? '-' : '+'}
                       {transaction.amount.toFixed(2)} €
                     </p>
-                    <p className="transaction-date">
+                    <p className={styles.transactionDate}>
                       {new Date(transaction.date).toLocaleDateString('fr-FR')}
                     </p>
                   </div>
                 </div>
-                <div className="transaction-actions">
+                <div className={styles.transactionActions}>
                   <button 
                     onClick={() => onEdit(transaction)}
-                    className="btn btn-edit"
+                    className={`${styles.btn} ${styles.btnEdit}`}
                     title="Modifier"
                   >
                     ✏️
                   </button>
                   <button 
                     onClick={() => onDelete(transaction.id)}
-                    className="btn btn-delete"
+                    className={`${styles.btn} ${styles.btnDelete}`}
                     title="Supprimer"
                   >
                     🗑️

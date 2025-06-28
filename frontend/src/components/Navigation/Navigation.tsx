@@ -1,26 +1,26 @@
 import { Link, useLocation } from 'react-router-dom'
-import './Navigation.css'
+import styles from './Navigation.module.css'
 
 const Navigation = () => {
   const location = useLocation()
 
   return (
-    <nav className="navigation">
-      <div className="nav-container">
-        <Link to="/" className="nav-logo">
+    <nav className={styles.navigation}>
+      <div className={styles.navContainer}>
+        <Link to="/" className={styles.navLogo}>
           💰 BudgSmart
         </Link>
         
-        <div className="nav-links">
+        <div className={styles.navLinks}>
           <Link 
             to="/dashboard" 
-            className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}
+            className={`${styles.navLink} ${location.pathname === '/dashboard' ? styles.active : ''}`}
           >
             Dashboard
           </Link>
           <Link 
             to="/login" 
-            className={`nav-link ${location.pathname === '/login' ? 'active' : ''}`}
+            className={`${styles.navLink} ${location.pathname === '/login' ? styles.active : ''}`}
           >
             Connexion
           </Link>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { FormData } from '../types/Transaction'
-import './TransactionForm.css'
+import { FormData } from '../../types/Transaction'
+import styles from './TransactionForm.module.css'
 
 interface TransactionFormProps {
   onSubmit: (formData: FormData) => void
@@ -63,10 +63,10 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
   }
 
   return (
-    <div className="form-section">
+    <div className={styles.formSection}>
       <h2>{editingTransaction ? 'Modifier la transaction' : 'Nouvelle transaction'}</h2>
-      <form onSubmit={handleSubmit} className="transaction-form">
-        <div className="form-group">
+      <form onSubmit={handleSubmit} className={styles.transactionForm}>
+        <div className={styles.formGroup}>
           <label htmlFor="description">Description</label>
           <input
             type="text"
@@ -79,8 +79,8 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
           />
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
+        <div className={styles.formRow}>
+          <div className={styles.formGroup}>
             <label htmlFor="amount">Montant (€)</label>
             <input
               type="number"
@@ -95,7 +95,7 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="type">Type</label>
             <select
               id="type"
@@ -109,8 +109,8 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
+        <div className={styles.formRow}>
+          <div className={styles.formGroup}>
             <label htmlFor="category">Catégorie</label>
             <select
               id="category"
@@ -126,7 +126,7 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
             </select>
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="date">Date</label>
             <input
               type="date"
@@ -139,12 +139,12 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
           </div>
         </div>
 
-        <div className="form-buttons">
-          <button type="submit" className="btn btn-primary">
+        <div className={styles.formButtons}>
+          <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>
             {editingTransaction ? 'Modifier' : 'Ajouter'}
           </button>
           {editingTransaction && (
-            <button type="button" onClick={handleCancel} className="btn btn-secondary">
+            <button type="button" onClick={handleCancel} className={`${styles.btn} ${styles.btnSecondary}`}>
               Annuler
             </button>
           )}
