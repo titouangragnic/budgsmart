@@ -31,8 +31,6 @@ export class ApiService {
   }
 
   static async get<T>(endpoint: string): Promise<T> {
-    
-        console.log(this.baseUrl);
     return this.request<T>(endpoint, { method: 'GET' });
   }
 
