@@ -9,9 +9,13 @@ export class ApiService {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
+    // Récupérer le token d'authentification s'il existe
+    const token = localStorage.getItem('budgsmart_token');
+    
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,

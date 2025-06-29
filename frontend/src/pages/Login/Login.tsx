@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import styles from './Login.module.css'
 
 const Login = () => {
@@ -7,7 +8,19 @@ const Login = () => {
     email: '',
     password: ''
   })
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login, isAuthenticated } = useAuth()
+
+  // Rediriger si déjà connecté
+  useEffect(() => {
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/dashboard'
+      navigate(from, { replace: true })
+    }
+  }, [isAuthenticated, navigate, location])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -15,15 +28,25 @@ const Login = () => {
       ...prev,
       [name]: value
     }))
+    // Effacer l'erreur quand l'utilisateur tape
+    if (error) setError('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement authentication logic
-    console.log('Login attempt:', formData)
+    setIsLoading(true)
+    setError('')
     
-    // For now, just redirect to dashboard
-    navigate('/dashboard')
+    try {
+      await login(formData.email, formData.password)
+      const from = (location.state as any)?.from?.pathname || '/dashboard'
+      navigate(from, { replace: true })
+    } catch (error: any) {
+      console.error('Erreur de connexion:', error)
+      setError(error.message || 'Erreur de connexion. Veuillez réessayer.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -33,6 +56,12 @@ const Login = () => {
         <h2>Connexion</h2>
         
         <form onSubmit={handleSubmit} className={styles.loginForm}>
+          {error && (
+            <div className={styles.errorMessage}>
+              {error}
+            </div>
+          )}
+          
           <div className={styles.formGroup}>
             <label htmlFor="email">Email</label>
             <input
@@ -43,6 +72,7 @@ const Login = () => {
               onChange={handleInputChange}
               placeholder="votre@email.com"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -56,16 +86,21 @@ const Login = () => {
               onChange={handleInputChange}
               placeholder="••••••••"
               required
+              disabled={isLoading}
             />
           </div>
 
-          <button type="submit" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}>
-            Se connecter
+          <button 
+            type="submit" 
+            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnFull}`}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
 
         <div className={styles.loginFooter}>
-          <p>Pas encore de compte ? <a href="#register">S'inscrire</a></p>
+          <p>Pas encore de compte ? <Link to="/register">S'inscrire</Link></p>
         </div>
       </div>
     </div>

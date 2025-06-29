@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTransactions } from '../../hooks/useTransactions'
+import { useAuth } from '../../contexts/AuthContext'
 import Header from '../../components/Header'
 import Summary from '../../components/Summary'
 import TransactionForm from '../../components/TransactionForm'
@@ -8,10 +9,18 @@ import { Transaction, FormData } from '../../types/Transaction'
 import styles from './Dashboard.module.css'
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const { transactions, addTransaction, updateTransaction, deleteTransaction, getBalance } = useTransactions()
   const [editingTransaction, setEditingTransaction] = useState<(FormData & { id: number }) | null>(null)
 
   const { totalIncome, totalExpenses, balance } = getBalance()
+
+  const getWelcomeMessage = () => {
+    if (user?.firstName) {
+      return `Bonjour ${user.firstName} !`
+    }
+    return 'Bonjour !'
+  }
 
   const handleSubmit = (formData: FormData) => {
     if (editingTransaction) {
@@ -40,7 +49,7 @@ const Dashboard = () => {
   return (
     <div className={styles.dashboard}>
       <Header 
-        title="💰 BudgSmart" 
+        title={getWelcomeMessage()} 
         subtitle="Gérez votre budget personnel" 
       />
       
