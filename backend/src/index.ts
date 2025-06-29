@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes";
@@ -23,13 +23,13 @@ app.use(cors({
 app.use(express.json());
 
 // Middleware de logging
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
 // Health check endpoint pour vérifier l'état de l'API
-app.get("/health", async (req, res) => {
+app.get("/health", async (req: Request, res: Response) => {
   try {
     // Test de connexion à la base de données
     const prisma = (await import('./config/database')).default;
@@ -57,7 +57,7 @@ app.use("/api", userRoutes);
 app.use("/api/auth", authRoutes);
 
 // Endpoint de statut détaillé pour l'API
-app.get("/api/status", (req, res) => {
+app.get("/api/status", (req: Request, res: Response) => {
   res.status(200).json({
     service: "BudgSmart API",
     status: "running",
