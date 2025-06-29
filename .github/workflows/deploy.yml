@@ -56,10 +56,52 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: dist
   deploy-backend:
+    name: Déploiement Backend et Base de Données
     runs-on: ubuntu-latest
 
     steps:
-    - name: Call Render Deploy Hook
+    - name: Checkout du code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Installation des dépendances backend
+      run: |
+        cd backend
+        npm ci
+
+    - name: Génération du client Prisma
+      run: |
+        cd backend
+        npm run db:generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Déploiement des migrations de base de données
+      run: |
+        cd backend
+        echo "🗄️ Déploiement des migrations..."
+        npm run db:migrate:deploy
+        echo "✅ Migrations déployées avec succès"
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+    - name: Test de connexion à la base de données
+      run: |
+        cd backend
+        echo "🔍 Test de connexion à la base de données..."
+        npm run db:check
+        echo "✅ Base de données opérationnelle"
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    - name: Déclenchement du déploiement Render
       run: curl "$RENDER_DEPLOY_HOOK_URL"
       env:
         RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
