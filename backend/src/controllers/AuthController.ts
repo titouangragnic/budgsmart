@@ -1,129 +1,117 @@
 import { Request, Response } from 'express';
-import prisma from '../config/database';
-import { hashPassword, comparePassword, generateToken } from '../utils/auth';
-import { AuthenticatedRequest } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { validate } from 'class-validator';
+import { AppDataSource } from '../config/database';
+import { User } from '../models/User';
 
-export const register = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, password, firstName, lastName } = req.body;
+const userRepository = AppDataSource.getRepository(User);
 
-    // Validation basique
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email et mot de passe requis' });
-      return;
-    }
+export class AuthController {
+  async register(req: Request, res: Response) {
+    try {
+      const { email, firstName, lastName, password } = req.body;
 
-    if (password.length < 6) {
-      res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
-      return;
-    }
-
-    // Vérifier si l'utilisateur existe déjà
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (existingUser) {
-      res.status(400).json({ error: 'Un utilisateur avec cet email existe déjà' });
-      return;
-    }
-
-    // Hasher le mot de passe
-    const hashedPassword = await hashPassword(password);
-
-    // Créer l'utilisateur
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        createdAt: true,
+      // Check if user already exists
+      const existingUser = await userRepository.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User already exists' });
       }
-    });
 
-    // Générer le token
-    const token = generateToken(user.id);
+      // Create new user
+      const user = new User();
+      user.email = email;
+      user.firstName = firstName;
+      user.lastName = lastName;
+      user.password = await bcrypt.hash(password, 12);
 
-    res.status(201).json({
-      message: 'Inscription réussie',
-      user,
-      token,
-    });
-  } catch (error) {
-    console.error('Erreur inscription:', error);
-    res.status(500).json({ error: 'Erreur serveur lors de l\'inscription' });
-  }
-};
-
-export const login = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email, password } = req.body;
-
-    // Validation basique
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email et mot de passe requis' });
-      return;
-    }
-
-    // Trouver l'utilisateur
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (!user) {
-      res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-      return;
-    }
-
-    // Vérifier le mot de passe
-    const isPasswordValid = await comparePassword(password, user.password);
-
-    if (!isPasswordValid) {
-      res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-      return;
-    }
-
-    // Générer le token
-    const token = generateToken(user.id);
-
-    // Retourner les infos utilisateur sans le mot de passe
-    const { password: _, ...userWithoutPassword } = user;
-
-    res.json({
-      message: 'Connexion réussie',
-      user: userWithoutPassword,
-      token,
-    });
-  } catch (error) {
-    console.error('Erreur connexion:', error);
-    res.status(500).json({ error: 'Erreur serveur lors de la connexion' });
-  }
-};
-
-export const getProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user?.id },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        createdAt: true,
-        updatedAt: true,
+      // Validate user data
+      const errors = await validate(user);
+      if (errors.length > 0) {
+        return res.status(400).json({ errors });
       }
-    });
 
-    res.json({ user });
-  } catch (error) {
-    console.error('Erreur profil:', error);
-    res.status(500).json({ error: 'Erreur serveur lors de la récupération du profil' });
+      await userRepository.save(user);
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET!,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      res.status(201).json({
+        message: 'User created successfully',
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Server error', error });
+    }
   }
-};
+
+  async login(req: Request, res: Response) {
+    try {
+      const { email, password } = req.body;
+
+      // Find user by email
+      const user = await userRepository.findOne({ where: { email } });
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Check password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id },
+        process.env.JWT_SECRET!,
+        { expiresIn: process.env.JWT_EXPIRES_IN }
+      );
+
+      res.json({
+        message: 'Login successful',
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          balance: user.balance
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Server error', error });
+    }
+  }
+
+  async getProfile(req: Request, res: Response) {
+    try {
+      const userId = (req as any).userId;
+      const user = await userRepository.findOne({ where: { id: userId } });
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        balance: user.balance
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Server error', error });
+    }
+  }
+}

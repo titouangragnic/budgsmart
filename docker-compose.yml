@@ -3,15 +3,45 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: local_postgres
+    container_name: budgsmart_postgres
+    environment:
+      POSTGRES_DB: budgsmart
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: budgsmart_db
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - budgsmart_network
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: budgsmart_backend
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: password
+      DB_DATABASE: budgsmart
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    networks:
+      - budgsmart_network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
 
 volumes:
-  pgdata:
+  postgres_data:
+
+networks:
+  budgsmart_network:
+    driver: bridge

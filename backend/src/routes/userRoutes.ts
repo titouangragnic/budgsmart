@@ -1,8 +1,16 @@
-import { Router } from "express";
-import { getUsers } from "../controllers/UserController";
+import { Router } from 'express';
+import { UserController } from '../controllers/UserController';
+import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
+const userController = new UserController();
 
-router.get("/users", getUsers);
+// All routes are protected
+router.use(authMiddleware);
+
+router.get('/profile', userController.getUser);
+router.put('/profile', userController.updateUser);
+router.delete('/profile', userController.deleteUser);
+router.get('/stats', userController.getUserStats);
 
 export default router;

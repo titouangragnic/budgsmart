@@ -1,27 +1,37 @@
-# Node modules
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Dependencies
 node_modules/
 
 # Build output
 dist/
-
-# Environment variables
-.env
+build/
 
 # Logs
-logs/
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# TypeScript cache
-*.tsbuildinfo
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# OS / Editor files
-.DS_Store
-Thumbs.db
+# Coverage directory used by tools like istanbul
+coverage/
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Ignore coverage reports (si tu ajoutes des tests)
-coverage/
+# OS
+.DS_Store
+Thumbs.db
