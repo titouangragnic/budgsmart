@@ -5,7 +5,7 @@ import styles from './TransactionList.module.css'
 interface TransactionListProps {
   transactions: Transaction[]
   onEdit: (transaction: Transaction) => void
-  onDelete: (id: number) => void
+  onDelete: (id: string) => void
 }
 
 const TransactionList = ({ transactions, onEdit, onDelete }: TransactionListProps) => {

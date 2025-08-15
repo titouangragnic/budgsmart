@@ -86,12 +86,23 @@ export class AuthService {
       throw new Error('Aucun token d\'authentification');
     }
 
-    return ApiService.request<{ user: User }>('/auth/profile', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    try {
+      return await ApiService.request<{ user: User }>('/auth/profile', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+    } catch (error: any) {
+      // Si c'est une erreur 401, le token est invalide
+      if (error?.message?.includes('401') || error?.message?.includes('Unauthorized')) {
+        // Nettoyer automatiquement les données locales
+        this.logout();
+        throw new Error('Token expiré ou invalide');
+      }
+      // Pour les autres erreurs, les propager sans nettoyer
+      throw error;
+    }
   }
 
   static logout(): void {

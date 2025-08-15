@@ -1,12 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import AuthProvider from './contexts/AuthContext'
+import { AuthProvider } from './contexts/AuthContext'
 import ApiLoader from './components/ApiLoader'
 import Navigation from './components/Navigation'
 import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
-import Register from './pages/Register'
 import './App.css'
 
 function App() {
@@ -27,7 +26,6 @@ function App() {
                 } 
               />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

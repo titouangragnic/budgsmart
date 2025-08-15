@@ -5,38 +5,44 @@ import { Transaction } from './Transaction';
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ unique: true })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @Column()
   @IsNotEmpty()
   @MinLength(2)
-  firstName: string;
+  firstName!: string;
 
   @Column()
   @IsNotEmpty()
   @MinLength(2)
-  lastName: string;
+  lastName!: string;
 
   @Column()
   @MinLength(6)
-  password: string;
+  password!: string;
+
+  @Column({ nullable: true })
+  googleId!: string;
+
+  @Column({ nullable: true })
+  picture!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  balance: number;
+  balance!: number;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @OneToMany(() => Transaction, transaction => transaction.user)
-  transactions: Transaction[];
+  transactions!: Transaction[];
 }

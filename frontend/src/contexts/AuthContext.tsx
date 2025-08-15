@@ -1,14 +1,30 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AuthService, { User } from '../services/AuthService';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { googleOAuthConfig } from '../config/google-oauth-config';
+import ApiService from '../services/ApiService';
+
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
+export interface User {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  picture?: string;
+}
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
+  login: () => Promise<void>;
   logout: () => void;
-  refreshProfile: () => Promise<void>;
+  getAccessToken: () => Promise<string | undefined>;
+  register?: (userData: any) => Promise<void>; // Pour compatibility avec l'ancienne interface
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,81 +43,178 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [accessToken, setAccessToken] = useState<string | undefined>(undefined);
 
+  // Token getter function
+  const getAccessToken = async (): Promise<string | undefined> => {
+    return accessToken;
+  };
+
+  // Configure ApiService to use our token getter
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté au démarrage
-    const initAuth = async () => {
-      try {
-        const savedUser = AuthService.getUser();
-        if (savedUser && AuthService.isAuthenticated()) {
-          // Vérifier que le token est toujours valide en récupérant le profil
-          const profileResponse = await AuthService.getProfile();
-          setUser(profileResponse.user);
-        }
-      } catch (error) {
-        console.error('Erreur lors de l\'initialisation de l\'authentification:', error);
-        // Si le token n'est plus valide, nettoyer le localStorage
-        AuthService.logout();
-      } finally {
-        setIsLoading(false);
+    ApiService.setTokenGetter(getAccessToken);
+  }, [accessToken]);
+
+  // Charger Google Identity Services
+  useEffect(() => {
+    const loadGoogleScript = () => {
+      if (window.google) {
+        initializeGoogleAuth();
+        return;
       }
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.onload = initializeGoogleAuth;
+      document.head.appendChild(script);
     };
 
-    initAuth();
+    const initializeGoogleAuth = () => {
+      if (window.google) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: googleOAuthConfig.clientId,
+            callback: handleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            // Add FedCM configuration to suppress warnings
+            use_fedcm_for_prompt: true,
+            // Additional configuration for better compatibility
+            itp_support: true,
+            ux_mode: 'popup', // Prefer popup mode for better reliability
+          });
+
+          // Vérifier si l'utilisateur est déjà connecté
+          const savedUser = localStorage.getItem('google_user');
+          const savedToken = localStorage.getItem('google_token');
+          
+          if (savedUser && savedToken) {
+            setUser(JSON.parse(savedUser));
+            setAccessToken(savedToken);
+            setIsAuthenticated(true);
+          }
+        } catch (error) {
+          console.error('Failed to initialize Google Auth:', error);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    loadGoogleScript();
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const handleCredentialResponse = async (response: any) => {
     try {
-      const response = await AuthService.login({ email, password });
-      setUser(response.user);
+      // Send Google ID token to backend for verification and user creation/login
+      const credential = response.credential;
+      
+      const authResponse = await fetch('http://localhost:3000/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: credential }),
+      });
+
+      if (!authResponse.ok) {
+        const errorData = await authResponse.json();
+        throw new Error(errorData.message || 'Failed to authenticate with backend');
+      }
+
+      const { user: backendUser, token: jwtToken } = await authResponse.json();
+
+      const googleUser: User = {
+        id: backendUser.id,
+        email: backendUser.email,
+        firstName: backendUser.firstName,
+        lastName: backendUser.lastName,
+        name: `${backendUser.firstName} ${backendUser.lastName}`.trim(),
+        picture: backendUser.picture,
+      };
+
+      // Save JWT token from backend (not Google token)
+      localStorage.setItem('google_user', JSON.stringify(googleUser));
+      localStorage.setItem('google_token', jwtToken);
+
+      setUser(googleUser);
+      setAccessToken(jwtToken);
+      setIsAuthenticated(true);
     } catch (error) {
-      console.error('Erreur de connexion:', error);
-      throw error;
+      console.error('Erreur lors de la connexion Google:', error);
+      alert('Erreur lors de la connexion: ' + (error as Error).message);
     }
   };
 
-  const register = async (email: string, password: string, firstName?: string, lastName?: string): Promise<void> => {
-    try {
-      const response = await AuthService.register({ email, password, firstName, lastName });
-      setUser(response.user);
-    } catch (error) {
-      console.error('Erreur d\'inscription:', error);
-      throw error;
-    }
+  const login = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!window.google) {
+        reject(new Error('Google Identity Services not loaded'));
+        return;
+      }
+
+      try {
+        // Use the modern approach with better error handling
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed()) {
+            console.info('Google One Tap was not displayed - this is normal with FedCM migration');
+            // Don't reject, just resolve - the user can use the rendered button
+            resolve();
+          } else if (notification.isSkippedMoment()) {
+            console.info('Google One Tap was skipped - user can still use the sign-in button');
+            // Don't reject, just resolve - the user can use the rendered button
+            resolve();
+          } else if (notification.isDismissedMoment()) {
+            console.info('Google One Tap was dismissed by user');
+            resolve();
+          } else {
+            // One Tap was displayed successfully
+            resolve();
+          }
+        });
+      } catch (error) {
+        console.error('Error with Google One Tap:', error);
+        // Don't reject - just resolve and let the user use the rendered button
+        resolve();
+      }
+    });
   };
 
   const logout = (): void => {
-    AuthService.logout();
+    if (window.google) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    
+    localStorage.removeItem('google_user');
+    localStorage.removeItem('google_token');
+    
     setUser(null);
+    setAccessToken(undefined);
+    setIsAuthenticated(false);
   };
 
-  const refreshProfile = async (): Promise<void> => {
-    try {
-      if (AuthService.isAuthenticated()) {
-        const profileResponse = await AuthService.getProfile();
-        setUser(profileResponse.user);
-        AuthService.setUser(profileResponse.user);
-      }
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du profil:', error);
-      // Si la récupération du profil échoue, déconnecter l'utilisateur
-      logout();
-      throw error;
-    }
+  // Fonction register pour compatibilité (pas utilisée avec Google OAuth)
+  const register = async (_userData: any): Promise<void> => {
+    throw new Error('Register not available with Google OAuth. Use login instead.');
   };
 
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isLoading,
     login,
-    register,
     logout,
-    refreshProfile,
+    getAccessToken,
+    register,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export default AuthProvider;

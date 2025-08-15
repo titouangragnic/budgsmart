@@ -1,7 +1,13 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export class ApiService {
   private static baseUrl = API_BASE_URL;
+  private static getAccessToken: (() => Promise<string | undefined>) | null = null;
+
+  // Méthode pour définir la fonction de récupération de token
+  static setTokenGetter(tokenGetter: () => Promise<string | undefined>) {
+    this.getAccessToken = tokenGetter;
+  }
 
   static async request<T>(
     endpoint: string,
@@ -9,8 +15,16 @@ export class ApiService {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
-    // Récupérer le token d'authentification s'il existe
-    const token = localStorage.getItem('budgsmart_token');
+    // Récupérer le token Auth0 s'il existe
+    let token: string | undefined;
+    if (this.getAccessToken) {
+      try {
+        token = await this.getAccessToken();
+        console.log(token);
+      } catch (error) {
+        console.warn('Erreur lors de la récupération du token:', error);
+      }
+    }
     
     const config: RequestInit = {
       headers: {
@@ -25,7 +39,13 @@ export class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Améliorer la gestion des erreurs pour inclure le statut
+        const errorMessage = `HTTP error! status: ${response.status}`;
+        if (response.status === 401) {
+          // Token invalide ou expiré
+          throw new Error(`${errorMessage} - Unauthorized`);
+        }
+        throw new Error(errorMessage);
       }
       return await response.json();
     } catch (error) {

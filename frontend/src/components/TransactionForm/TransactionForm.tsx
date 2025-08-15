@@ -3,12 +3,13 @@ import { FormData } from '../../types/Transaction'
 import styles from './TransactionForm.module.css'
 
 interface TransactionFormProps {
-  onSubmit: (formData: FormData) => void
-  editingTransaction?: FormData & { id: number } | null
+  onSubmit: (formData: FormData) => Promise<void> | void
+  editingTransaction?: FormData & { id: string } | null
   onCancelEdit?: () => void
 }
 
 const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: TransactionFormProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     description: editingTransaction?.description || '',
     amount: editingTransaction?.amount || '',
@@ -18,8 +19,16 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
   })
 
   const categories = [
-    'Alimentation', 'Transport', 'Logement', 'Divertissement', 
-    'Santé', 'Éducation', 'Shopping', 'Utilities', 'Autre'
+    { value: 'food', label: 'Alimentation' },
+    { value: 'transport', label: 'Transport' },
+    { value: 'entertainment', label: 'Divertissement' },
+    { value: 'health', label: 'Santé' },
+    { value: 'shopping', label: 'Shopping' },
+    { value: 'bills', label: 'Factures' },
+    { value: 'salary', label: 'Salaire' },
+    { value: 'freelance', label: 'Freelance' },
+    { value: 'investment', label: 'Investissement' },
+    { value: 'other', label: 'Autre' }
   ]
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -30,24 +39,32 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.description || !formData.amount || !formData.category) {
       alert('Veuillez remplir tous les champs')
       return
     }
 
-    onSubmit(formData)
-    
-    // Reset form if not editing
-    if (!editingTransaction) {
-      setFormData({
-        description: '',
-        amount: '',
-        type: 'expense',
-        category: '',
-        date: new Date().toISOString().split('T')[0]
-      })
+    try {
+      setIsSubmitting(true)
+      await onSubmit(formData)
+      
+      // Reset form if not editing
+      if (!editingTransaction) {
+        setFormData({
+          description: '',
+          amount: '',
+          type: 'expense',
+          category: '',
+          date: new Date().toISOString().split('T')[0]
+        })
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error)
+      alert('Erreur lors de la soumission du formulaire')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -121,7 +138,7 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
             >
               <option value="">Choisir une catégorie</option>
               {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
               ))}
             </select>
           </div>
@@ -140,11 +157,20 @@ const TransactionForm = ({ onSubmit, editingTransaction, onCancelEdit }: Transac
         </div>
 
         <div className={styles.formButtons}>
-          <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>
-            {editingTransaction ? 'Modifier' : 'Ajouter'}
+          <button 
+            type="submit" 
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'En cours...' : (editingTransaction ? 'Modifier' : 'Ajouter')}
           </button>
           {editingTransaction && (
-            <button type="button" onClick={handleCancel} className={`${styles.btn} ${styles.btnSecondary}`}>
+            <button 
+              type="button" 
+              onClick={handleCancel} 
+              className={`${styles.btn} ${styles.btnSecondary}`}
+              disabled={isSubmitting}
+            >
               Annuler
             </button>
           )}

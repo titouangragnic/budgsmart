@@ -9,6 +9,12 @@ const UserProfile = () => {
   }
 
   const getDisplayName = () => {
+    if (user.name) {
+      return user.name;
+    }
+    if (user.nickname) {
+      return user.nickname;
+    }
     if (user.firstName && user.lastName) {
       return `${user.firstName} ${user.lastName}`;
     }
@@ -19,25 +25,27 @@ const UserProfile = () => {
   };
 
   const getInitials = () => {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    const displayName = getDisplayName();
+    const nameParts = displayName.split(' ');
+    if (nameParts.length >= 2) {
+      return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
     }
-    if (user.firstName) {
-      return user.firstName[0].toUpperCase();
-    }
-    return user.email[0].toUpperCase();
+    return displayName[0].toUpperCase();
   };
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/budgsmart/login';
   };
 
   return (
     <div className={styles.userProfile}>
       <div className={styles.profileInfo}>
         <div className={styles.avatar}>
-          {getInitials()}
+          {user.picture ? (
+            <img src={user.picture} alt="Profile" className={styles.avatarImage} />
+          ) : (
+            getInitials()
+          )}
         </div>
         <div className={styles.userDetails}>
           <span className={styles.userName}>{getDisplayName()}</span>

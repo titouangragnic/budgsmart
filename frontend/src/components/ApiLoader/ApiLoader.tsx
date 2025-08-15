@@ -7,7 +7,7 @@ interface ApiLoaderProps {
 
 const ApiLoader: React.FC<ApiLoaderProps> = ({ children }) => {
   const { isLoading, error, retryCount } = useApiStatus();
-
+  
   if (error) {
     return (
       <div className={styles.errorContainer}>

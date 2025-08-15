@@ -10,8 +10,8 @@ import styles from './Dashboard.module.css'
 
 const Dashboard = () => {
   const { user } = useAuth()
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, getBalance } = useTransactions()
-  const [editingTransaction, setEditingTransaction] = useState<(FormData & { id: number }) | null>(null)
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, getBalance, loading, error } = useTransactions()
+  const [editingTransaction, setEditingTransaction] = useState<(FormData & { id: string }) | null>(null)
 
   const { totalIncome, totalExpenses, balance } = getBalance()
 
@@ -22,12 +22,16 @@ const Dashboard = () => {
     return 'Bonjour !'
   }
 
-  const handleSubmit = (formData: FormData) => {
-    if (editingTransaction) {
-      updateTransaction(editingTransaction.id, formData)
-      setEditingTransaction(null)
-    } else {
-      addTransaction(formData)
+  const handleSubmit = async (formData: FormData) => {
+    try {
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, formData)
+        setEditingTransaction(null)
+      } else {
+        await addTransaction(formData)
+      }
+    } catch (error) {
+      console.error('Error submitting transaction:', error)
     }
   }
 
@@ -53,6 +57,12 @@ const Dashboard = () => {
         subtitle="Gérez votre budget personnel" 
       />
       
+      {error && (
+        <div className={styles.error}>
+          {error}
+        </div>
+      )}
+      
       <Summary 
         totalIncome={totalIncome}
         totalExpenses={totalExpenses}
@@ -66,11 +76,15 @@ const Dashboard = () => {
           onCancelEdit={handleCancelEdit}
         />
         
-        <TransactionList 
-          transactions={transactions}
-          onEdit={handleEdit}
-          onDelete={deleteTransaction}
-        />
+        {loading ? (
+          <div className={styles.loading}>Chargement...</div>
+        ) : (
+          <TransactionList 
+            transactions={transactions}
+            onEdit={handleEdit}
+            onDelete={deleteTransaction}
+          />
+        )}
       </div>
     </div>
   )

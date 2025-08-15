@@ -1,63 +1,54 @@
 import dotenv from 'dotenv';
 
-// Load environment variables
 dotenv.config();
 
-interface EnvironmentConfig {
-  NODE_ENV: string;
-  PORT: number;
-  
-  // Database
-  DB_HOST: string;
-  DB_PORT: number;
-  DB_USERNAME: string;
-  DB_PASSWORD: string;
-  DB_DATABASE: string;
-  
-  // JWT
-  JWT_SECRET: string;
-  JWT_EXPIRES_IN: string;
-  
-  // Features
-  ENABLE_LOGGING: boolean;
-  ENABLE_CORS: boolean;
-}
-
-export const config: EnvironmentConfig = {
+export const config = {
+  // Server Configuration
+  PORT: process.env.PORT || 3000,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3000'),
-  
-  // Database
+
+  // Database Configuration
   DB_HOST: process.env.DB_HOST || 'localhost',
   DB_PORT: parseInt(process.env.DB_PORT || '5432'),
   DB_USERNAME: process.env.DB_USERNAME || 'postgres',
   DB_PASSWORD: process.env.DB_PASSWORD || 'password',
-  DB_DATABASE: process.env.DB_DATABASE || 'budgsmart',
-  
-  // JWT
-  JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-key',
+  DB_NAME: process.env.DB_NAME || 'budgsmart',
+
+  // JWT Configuration
+  JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-  
-  // Features
-  ENABLE_LOGGING: process.env.NODE_ENV === 'development',
-  ENABLE_CORS: process.env.ENABLE_CORS !== 'false'
+
+  // Google OAuth Configuration
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+
+  // CORS Configuration
+  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+
+  // Security
+  BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12'),
 };
 
-// Validate required environment variables
+// Validation function for critical environment variables
 export const validateConfig = (): void => {
-  const requiredVars = ['JWT_SECRET'];
-  
-  for (const varName of requiredVars) {
-    if (!process.env[varName]) {
-      throw new Error(`Required environment variable ${varName} is not set`);
+  const requiredEnvVars = [
+    'JWT_SECRET',
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'DB_PASSWORD'
+  ];
+
+  const missingVars: string[] = [];
+
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      missingVars.push(envVar);
     }
   }
-  
-  if (config.NODE_ENV === 'production' && config.JWT_SECRET === 'fallback-secret-key') {
-    throw new Error('JWT_SECRET must be set in production environment');
+
+  if (missingVars.length > 0) {
+    console.warn(`⚠️  Warning: The following environment variables are not set: ${missingVars.join(', ')}`);
   }
 };
 
-export const isDevelopment = (): boolean => config.NODE_ENV === 'development';
-export const isProduction = (): boolean => config.NODE_ENV === 'production';
-export const isTest = (): boolean => config.NODE_ENV === 'test';
+export default config;

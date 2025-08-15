@@ -23,47 +23,47 @@ export enum TransactionCategory {
 @Entity('transactions')
 export class Transaction {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column()
   @IsNotEmpty()
-  description: string;
+  description!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   @IsNumber()
-  amount: number;
+  amount!: number;
 
   @Column({
     type: 'enum',
     enum: TransactionType
   })
   @IsEnum(TransactionType)
-  type: TransactionType;
+  type!: TransactionType;
 
   @Column({
     type: 'enum',
     enum: TransactionCategory
   })
   @IsEnum(TransactionCategory)
-  category: TransactionCategory;
+  category!: TransactionCategory;
 
   @Column({ type: 'date' })
-  date: Date;
+  date!: Date;
 
   @Column({ nullable: true })
   @IsOptional()
   notes?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ManyToOne(() => User, user => user.transactions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
   @Column()
-  userId: string;
+  userId!: string;
 }
