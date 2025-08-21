@@ -106,13 +106,14 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_NAME
-        env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}/backend:latest
           script: |
+            export IMAGE_NAME="ghcr.io/${{ github.repository }}/backend:latest"
+            echo "Pulling image: $IMAGE_NAME"
             docker pull $IMAGE_NAME
+            echo "Stopping existing container..."
             docker stop budgsmart-backend || true
             docker rm budgsmart-backend || true
+            echo "Starting new container..."
             docker run -d --name budgsmart-backend \
               -e NODE_ENV=production \
               -e DB_HOST=${{ secrets.DB_HOST }} \
@@ -121,9 +122,11 @@ jobs:
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
               -e DB_DATABASE=budgsmart \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN}} \
+              -e JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }} \
               -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
               -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
               -e PORT=3000 \
               -p 8081:3000 \
               $IMAGE_NAME
+            echo "Container started successfully"
+            docker ps | grep budgsmart-backend
