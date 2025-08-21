@@ -102,12 +102,13 @@ jobs:
     steps:
       - name: Deploiment du backend via ssh
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}/backend:latest
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository }}/backend:latest
           script: |
             docker pull $IMAGE_NAME
             docker stop budgsmart-backend || true
