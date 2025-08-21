@@ -20,7 +20,6 @@ export class ApiService {
     if (this.getAccessToken) {
       try {
         token = await this.getAccessToken();
-        console.log(token);
       } catch (error) {
         console.warn('Erreur lors de la récupération du token:', error);
       }

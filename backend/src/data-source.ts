@@ -14,7 +14,7 @@ export default new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_DATABASE || 'budgsmart',
-  synchronize: false, // Always false for production safety
+  synchronize: true, // Always false for production safety
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Transaction],
   migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
