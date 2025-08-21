@@ -120,8 +120,8 @@ jobs:
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
               -e DB_DATABASE=budgsmart \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e JWT_EXPIRES_IN=${{ vars.JWT_EXPIRES_IN}} \
-              -e GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }} \
+              -e JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN}} \
+              -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
               -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
               -e PORT=3000 \
               -p 8081:3000 \
