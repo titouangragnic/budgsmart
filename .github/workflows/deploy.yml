@@ -115,6 +115,7 @@ jobs:
             docker rm budgsmart-backend || true
             echo "Starting new container..."
             docker run -d --name budgsmart-backend \
+                          --network budgsmart-net \
                           -e NODE_ENV=production \
                           -e DB_HOST="${{ secrets.DB_HOST }}" \
                           -e DB_PORT=80 \
