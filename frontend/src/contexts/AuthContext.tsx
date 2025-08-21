@@ -17,6 +17,17 @@ export interface User {
   picture?: string;
 }
 
+interface AuthResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    picture?: string;
+  };
+  token: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -111,20 +122,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Send Google ID token to backend for verification and user creation/login
       const credential = response.credential;
       
-      const authResponse = await fetch('http://localhost:3000/api/auth/google', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: credential }),
-      });
-
-      if (!authResponse.ok) {
-        const errorData = await authResponse.json();
-        throw new Error(errorData.message || 'Failed to authenticate with backend');
-      }
-
-      const { user: backendUser, token: jwtToken } = await authResponse.json();
+      const { user: backendUser, token: jwtToken } = await ApiService.post<AuthResponse>('/auth/google', { token: credential });
 
       const googleUser: User = {
         id: backendUser.id,
