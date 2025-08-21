@@ -23,7 +23,7 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           docker run --rm \
-            -e VITE_API_URL \
+            -e VITE_API_URL=${{ secrets.VITE_API_URL }} \
             -v ${{ github.workspace }}:/app \
             -w /app/frontend \
             node:20 \
