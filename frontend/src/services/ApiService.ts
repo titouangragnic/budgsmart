@@ -1,7 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { getApiBaseUrl } from '../utils/utils';
 
 export class ApiService {
-  private static baseUrl = API_BASE_URL;
+  private static baseUrl: string | null = null;
+  private static baseUrlPromise: Promise<string> | null = null;
   private static getAccessToken: (() => Promise<string | undefined>) | null = null;
 
   // Méthode pour définir la fonction de récupération de token
@@ -9,11 +10,26 @@ export class ApiService {
     this.getAccessToken = tokenGetter;
   }
 
+  // Méthode singleton pour récupérer l'URL de base
+  private static async getBaseUrl(): Promise<string> {
+    if (this.baseUrl) {
+      return this.baseUrl;
+    }
+
+    if (!this.baseUrlPromise) {
+      this.baseUrlPromise = getApiBaseUrl();
+    }
+
+    this.baseUrl = await this.baseUrlPromise;
+    return this.baseUrl;
+  }
+
   static async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    const baseUrl = await this.getBaseUrl();
+    const url = `${baseUrl}${endpoint}`;
     
     // Récupérer le token Auth0 s'il existe
     let token: string | undefined;

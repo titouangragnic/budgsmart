@@ -18,12 +18,9 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Build dans un conteneur Node avec VITE_API_URL
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - name: Build dans un conteneur Node
         run: |
           docker run --rm \
-            -e VITE_API_URL=${{ secrets.VITE_API_URL }} \
             -v ${{ github.workspace }}:/app \
             -w /app/frontend \
             node:20 \
@@ -39,6 +36,7 @@ jobs:
     name: Déploiement sur GitHub Pages
     runs-on: ubuntu-latest
     needs: build-frontend
+    environment: github-pages
 
     steps:
       - name: Checkout du code (nécessaire pour peaceiris)
@@ -49,6 +47,12 @@ jobs:
         with:
           name: dist-frontend
           path: dist
+
+      - name: Modifier config.json pour la production
+        run: |
+          echo '{
+            "API_BASE_URL": "${{ secrets.VITE_API_URL }}"
+          }' > dist/config.json
 
       - name: Déployer sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -115,6 +119,7 @@ jobs:
             docker rm budgsmart-backend || true
             echo "Starting new container..."
             docker run -d --name budgsmart-backend \
+                          --restart=always \
                           --network budgsmart-net \
                           -e NODE_ENV=production \
                           -e DB_HOST="${{ secrets.DB_HOST }}" \
