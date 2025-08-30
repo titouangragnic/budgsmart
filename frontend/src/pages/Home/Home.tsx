@@ -33,25 +33,25 @@ const Home = () => {
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>📊</div>
               <h3>Suivi des dépenses</h3>
-              <p>Enregistrez et catégorisez facilement toutes vos transactions</p>
+              <p>Enregistrez et catégorisez facilement toutes vos transactions.</p>
             </div>
             
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>💳</div>
               <h3>Gestion des revenus</h3>
-              <p>Suivez vos sources de revenus et votre flux de trésorerie</p>
+              <p>Suivez vos sources de revenus et votre flux de trésorerie.</p>
             </div>
             
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>📈</div>
               <h3>Tableaux de bord</h3>
-              <p>Visualisez votre situation financière en un coup d'œil</p>
+              <p>Visualisez votre situation financière en un coup d'œil.</p>
             </div>
             
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>🎯</div>
               <h3>Objectifs financiers</h3>
-              <p>Définissez et atteignez vos objectifs d'épargne</p>
+              <p>Définissez et atteignez vos objectifs d'épargne.</p>
             </div>
           </div>
         </div>
