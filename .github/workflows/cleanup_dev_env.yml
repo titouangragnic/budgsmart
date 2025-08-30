@@ -3,10 +3,6 @@ name: Cleanup Development Environment
 on:
     workflow_dispatch:
         inputs:
-            environment:
-                description: 'Environment to cleanup (branch name)'
-                required: true
-                type: string
             confirm:
                 description: 'Type "DELETE" to confirm cleanup'
                 required: true
@@ -19,8 +15,16 @@ jobs:
         outputs:
             safe-branch-name: ${{ steps.sanitize.outputs.safe-name }}
             confirmed: ${{ steps.validate.outputs.confirmed }}
+            branch-name: ${{ steps.get-branch.outputs.branch-name }}
             
         steps:
+            - name: Get current branch name
+              id: get-branch
+              run: |
+                BRANCH_NAME="${{ github.ref_name }}"
+                echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+                echo "Current branch: $BRANCH_NAME"
+                
             - name: Validate confirmation
               id: validate
               run: |
@@ -36,7 +40,7 @@ jobs:
             - name: Sanitize branch name
               id: sanitize
               run: |
-                SAFE_NAME="${{ github.event.inputs.environment }}"
+                SAFE_NAME="${{ steps.get-branch.outputs.branch-name }}"
                 SAFE_NAME="${SAFE_NAME//\//-}"  # remplace les / par -
                 SAFE_NAME="${SAFE_NAME//_/-}"   # remplace les _ par -
                 SAFE_NAME="${SAFE_NAME,,}"      # en minuscules
@@ -111,7 +115,7 @@ jobs:
                 echo "🗑️ Development environment cleanup completed!"
                 echo ""
                 echo "📋 Cleaned up:"
-                echo "  Environment: ${{ github.event.inputs.environment }}"
+                echo "  Environment: ${{ needs.validate-cleanup.outputs.branch-name }}"
                 echo "  Sanitized name: ${{ needs.validate-cleanup.outputs.safe-branch-name }}"
                 echo ""
                 echo "🐳 Removed containers:"

@@ -2,19 +2,15 @@ name: Deployment Development Environment
 
 on:
     workflow_dispatch:
-        inputs:
-            environment:
-                description: 'Environment to deploy to (branch name)'
-                required: true
-                type: string
 
 jobs:
     validate-branch:
-        name: Validate Branch Exists
+        name: Validate Branch and Prepare Environment
         runs-on: ubuntu-latest
         outputs:
             branch-exists: ${{ steps.check-branch.outputs.exists }}
             safe-branch-name: ${{ steps.sanitize.outputs.safe-name }}
+            branch-name: ${{ steps.get-branch.outputs.branch-name }}
             
         steps:
             - name: Checkout code
@@ -22,22 +18,30 @@ jobs:
               with:
                 fetch-depth: 0
                 
+            - name: Get current branch name
+              id: get-branch
+              run: |
+                BRANCH_NAME="${{ github.ref_name }}"
+                echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+                echo "Current branch: $BRANCH_NAME"
+                
             - name: Check if branch exists
               id: check-branch
               run: |
-                if git ls-remote --heads origin ${{ github.event.inputs.environment }} | grep -q "refs/heads/${{ github.event.inputs.environment }}"; then
+                BRANCH_NAME="${{ steps.get-branch.outputs.branch-name }}"
+                if git ls-remote --heads origin $BRANCH_NAME | grep -q "refs/heads/$BRANCH_NAME"; then
                   echo "exists=true" >> $GITHUB_OUTPUT
-                  echo "✅ Branch '${{ github.event.inputs.environment }}' exists"
+                  echo "✅ Branch '$BRANCH_NAME' exists"
                 else
                   echo "exists=false" >> $GITHUB_OUTPUT
-                  echo "❌ Branch '${{ github.event.inputs.environment }}' does not exist"
+                  echo "❌ Branch '$BRANCH_NAME' does not exist"
                   exit 1
                 fi
                 
             - name: Sanitize branch name for container naming
               id: sanitize
               run: |
-                SAFE_NAME="${{ github.event.inputs.environment }}"
+                SAFE_NAME="${{ steps.get-branch.outputs.branch-name }}"
                 SAFE_NAME="${SAFE_NAME//\//-}"  # remplace les / par -
                 SAFE_NAME="${SAFE_NAME//_/-}"   # remplace les _ par -
                 SAFE_NAME="${SAFE_NAME,,}"      # en minuscules
@@ -71,7 +75,7 @@ jobs:
                 echo "backend-port=$BACKEND_PORT" >> $GITHUB_OUTPUT
                 echo "db-port=$DB_PORT" >> $GITHUB_OUTPUT
                 
-                echo "Assigned ports for branch '${{ github.event.inputs.environment }}':"
+                echo "Assigned ports for branch '${{ needs.validate-branch.outputs.branch-name }}':"
                 echo "  Frontend: $FRONTEND_PORT"
                 echo "  Backend: $BACKEND_PORT"
                 echo "  Database: $DB_PORT"
@@ -195,7 +199,7 @@ jobs:
             - name: Checkout specific branch
               uses: actions/checkout@v4
               with:
-                ref: ${{ github.event.inputs.environment }}
+                ref: ${{ needs.validate-branch.outputs.branch-name }}
                 
             - name: Pull frontend image from GHCR
               run: |
@@ -286,7 +290,7 @@ jobs:
                 echo "🚀 Development environment deployed successfully!"
                 echo ""
                 echo "📋 Environment Details:"
-                echo "  Branch: ${{ github.event.inputs.environment }}"
+                echo "  Branch: ${{ needs.validate-branch.outputs.branch-name }}"
                 echo "  Environment name: ${{ needs.validate-branch.outputs.safe-branch-name }}"
                 echo ""
                 echo "🌐 Access URLs:"
