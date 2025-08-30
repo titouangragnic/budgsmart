@@ -1,0 +1,99 @@
+name: Build
+
+on: [push]
+
+jobs:
+    build-and-push-frontend:
+        name : Build and Push Frontend
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check for frontend changes
+              id: frontend-changes
+              uses: dorny/paths-filter@v2
+              with:
+                filters: |
+                  frontend:
+                    - 'frontend/**'
+
+            - name: Connexion à GHCR
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+
+            - name: Définir le nom de l'image
+              run: |
+                if [ "${{ github.ref_name }}" = "main" ]; then
+                  echo "IMAGE=ghcr.io/${{ github.repository }}/frontend:latest" >> $GITHUB_ENV
+                else
+                  SAFE_REF_NAME="${{ github.ref_name }}" 
+                  SAFE_REF_NAME="${SAFE_REF_NAME//\//-}"  # remplace les / par -
+                  SAFE_REF_NAME="${SAFE_REF_NAME//_/-}"   # remplace les _ par -
+                  SAFE_REF_NAME="${SAFE_REF_NAME,,}"      # en minuscules
+                  echo "IMAGE=ghcr.io/${{ github.repository }}/frontend:${SAFE_REF_NAME}" >> $GITHUB_ENV
+                fi
+
+            - name: Build Docker image (frontend)
+              if: steps.frontend-changes.outputs.frontend == 'true' || steps.image-exists.outputs.exists == 'false'
+              # run: docker build -t $IMAGE ./frontend 
+              run: docker build --build-arg VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }} -t $IMAGE ./frontend 
+
+            - name: Push Docker image to GHCR
+              if: steps.frontend-changes.outputs.frontend == 'true' || steps.image-exists.outputs.exists == 'false'
+              run: docker push $IMAGE
+    
+    build-and-push-backend:
+        name : Build and Push Backend
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+            packages: write
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Check for backend changes
+              id: backend-changes
+              uses: dorny/paths-filter@v2
+              with:
+                filters: |
+                  backend:
+                    - 'backend/**'
+
+            - name: Connexion à GHCR
+              run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            - name: Définir le nom de l'image
+              run: |
+                if [ "${{ github.ref_name }}" = "main" ]; then
+                  echo "IMAGE=ghcr.io/${{ github.repository }}/backend:latest" >> $GITHUB_ENV
+                else
+                  SAFE_REF_NAME="${{ github.ref_name }}" 
+                  SAFE_REF_NAME="${SAFE_REF_NAME//\//-}"  # remplace les / par -
+                  echo "IMAGE=ghcr.io/${{ github.repository }}/backend:${SAFE_REF_NAME}" >> $GITHUB_ENV
+                fi
+
+            - name: Check if image exists
+              id: image-exists
+              run: |
+                if docker manifest inspect $IMAGE > /dev/null 2>&1; then
+                  echo "exists=true" >> $GITHUB_OUTPUT
+                else
+                  echo "exists=false" >> $GITHUB_OUTPUT
+                fi
+
+            - name: Build Docker image (backend)
+              if: steps.backend-changes.outputs.backend == 'true' || steps.image-exists.outputs.exists == 'false'
+              run: docker build -t $IMAGE ./backend 
+
+            - name: Push Docker image to GHCR
+              if: steps.backend-changes.outputs.backend == 'true' || steps.image-exists.outputs.exists == 'false'
+              run: docker push $IMAGE

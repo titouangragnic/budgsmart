@@ -1,0 +1,305 @@
+name: Deployment Development Environment
+
+on:
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: 'Environment to deploy to (branch name)'
+                required: true
+                type: string
+
+jobs:
+    validate-branch:
+        name: Validate Branch Exists
+        runs-on: ubuntu-latest
+        outputs:
+            branch-exists: ${{ steps.check-branch.outputs.exists }}
+            safe-branch-name: ${{ steps.sanitize.outputs.safe-name }}
+            
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 0
+                
+            - name: Check if branch exists
+              id: check-branch
+              run: |
+                if git ls-remote --heads origin ${{ github.event.inputs.environment }} | grep -q "refs/heads/${{ github.event.inputs.environment }}"; then
+                  echo "exists=true" >> $GITHUB_OUTPUT
+                  echo "✅ Branch '${{ github.event.inputs.environment }}' exists"
+                else
+                  echo "exists=false" >> $GITHUB_OUTPUT
+                  echo "❌ Branch '${{ github.event.inputs.environment }}' does not exist"
+                  exit 1
+                fi
+                
+            - name: Sanitize branch name for container naming
+              id: sanitize
+              run: |
+                SAFE_NAME="${{ github.event.inputs.environment }}"
+                SAFE_NAME="${SAFE_NAME//\//-}"  # remplace les / par -
+                SAFE_NAME="${SAFE_NAME//_/-}"   # remplace les _ par -
+                SAFE_NAME="${SAFE_NAME,,}"      # en minuscules
+                echo "safe-name=$SAFE_NAME" >> $GITHUB_OUTPUT
+                echo "Sanitized name: $SAFE_NAME"
+    
+    get-next-port:
+        name: Get Next Available Port
+        runs-on: ubuntu-latest
+        needs: validate-branch
+        if: needs.validate-branch.outputs.branch-exists == 'true'
+        outputs:
+            frontend-port: ${{ steps.ports.outputs.frontend-port }}
+            backend-port: ${{ steps.ports.outputs.backend-port }}
+            db-port: ${{ steps.ports.outputs.db-port }}
+            
+        steps:
+            - name: Calculate ports based on branch name
+              id: ports
+              run: |
+                # Générer un hash du nom de branche pour avoir des ports consistants
+                BRANCH_HASH=$(echo "${{ needs.validate-branch.outputs.safe-branch-name }}" | md5sum | cut -c1-4)
+                HASH_NUM=$((0x$BRANCH_HASH))
+                
+                # Calculer les ports (base 8100+ pour éviter les conflits)
+                FRONTEND_PORT=$((8100 + ($HASH_NUM % 100)))
+                BACKEND_PORT=$((8200 + ($HASH_NUM % 100)))
+                DB_PORT=$((5500 + ($HASH_NUM % 100)))
+                
+                echo "frontend-port=$FRONTEND_PORT" >> $GITHUB_OUTPUT
+                echo "backend-port=$BACKEND_PORT" >> $GITHUB_OUTPUT
+                echo "db-port=$DB_PORT" >> $GITHUB_OUTPUT
+                
+                echo "Assigned ports for branch '${{ github.event.inputs.environment }}':"
+                echo "  Frontend: $FRONTEND_PORT"
+                echo "  Backend: $BACKEND_PORT"
+                echo "  Database: $DB_PORT"
+    
+    deploy-database:
+        name: Deploy PostgreSQL Database
+        runs-on: ubuntu-latest
+        needs: [validate-branch, get-next-port]
+        if: needs.validate-branch.outputs.branch-exists == 'true'
+        environment: production
+        
+        steps:
+            - name: Deploy PostgreSQL via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                  BRANCH_NAME="${{ needs.validate-branch.outputs.safe-branch-name }}"
+                  DB_CONTAINER_NAME="budgsmart-db-dev-${BRANCH_NAME}"
+                  NETWORK_NAME="budgsmart-dev-${BRANCH_NAME}"
+                  DB_PORT="${{ needs.get-next-port.outputs.db-port }}"
+                  
+                  echo "Setting up database for development environment: $BRANCH_NAME"
+                  
+                  # Créer le réseau s'il n'existe pas
+                  docker network create $NETWORK_NAME || true
+                  
+                  # Arrêter et supprimer le conteneur existant s'il existe
+                  docker stop $DB_CONTAINER_NAME || true
+                  docker rm $DB_CONTAINER_NAME || true
+                  
+                  # Démarrer le nouveau conteneur PostgreSQL
+                  docker run -d --name $DB_CONTAINER_NAME \
+                            --restart=unless-stopped \
+                            --network $NETWORK_NAME \
+                            -e POSTGRES_DB=budgsmart_dev \
+                            -e POSTGRES_USER=postgres \
+                            -e POSTGRES_PASSWORD=dev_password_123 \
+                            -p $DB_PORT:5432 \
+                            postgres:15
+                  
+                  echo "Database container started successfully on port $DB_PORT"
+                  
+                  # Attendre que la DB soit prête
+                  sleep 10
+                  docker ps | grep $DB_CONTAINER_NAME
+    
+    deploy-backend:
+        name: Deploy Backend
+        runs-on: ubuntu-latest
+        needs: [validate-branch, get-next-port, deploy-database]
+        if: needs.validate-branch.outputs.branch-exists == 'true'
+        environment: production
+        
+        steps:
+            - name: Deploy Backend via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                  BRANCH_NAME="${{ needs.validate-branch.outputs.safe-branch-name }}"
+                  BACKEND_CONTAINER_NAME="budgsmart-backend-dev-${BRANCH_NAME}"
+                  NETWORK_NAME="budgsmart-dev-${BRANCH_NAME}"
+                  BACKEND_PORT="${{ needs.get-next-port.outputs.backend-port }}"
+                  DB_CONTAINER_NAME="budgsmart-db-dev-${BRANCH_NAME}"
+                  
+                  # Image du backend depuis GHCR
+                  IMAGE_NAME="ghcr.io/${{ github.repository }}/backend:${BRANCH_NAME}"
+                  
+                  echo "Deploying backend for development environment: $BRANCH_NAME"
+                  echo "Pulling image: $IMAGE_NAME"
+                  
+                  # Pull de l'image
+                  docker pull $IMAGE_NAME
+                  
+                  # Arrêter et supprimer le conteneur existant s'il existe
+                  docker stop $BACKEND_CONTAINER_NAME || true
+                  docker rm $BACKEND_CONTAINER_NAME || true
+                  
+                  # Démarrer le nouveau conteneur backend
+                  docker run -d --name $BACKEND_CONTAINER_NAME \
+                            --restart=unless-stopped \
+                            --network $NETWORK_NAME \
+                            -e NODE_ENV=development \
+                            -e DB_HOST=$DB_CONTAINER_NAME \
+                            -e DB_PORT=5432 \
+                            -e DB_USERNAME=postgres \
+                            -e DB_PASSWORD=dev_password_123 \
+                            -e DB_DATABASE=budgsmart_dev \
+                            -e JWT_SECRET=dev_jwt_secret_$BRANCH_NAME \
+                            -e JWT_EXPIRES_IN=24h \
+                            -e GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}" \
+                            -e GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+                            -e PORT=3000 \
+                            -e CORS_ORIGIN="*" \
+                            -p $BACKEND_PORT:3000 \
+                            "$IMAGE_NAME"
+                  
+                  echo "Backend container started successfully on port $BACKEND_PORT"
+                  
+                  # Attendre que le backend soit prêt
+                  sleep 15
+                  
+                  # Exécuter les migrations
+                  echo "Running database migrations..."
+                  docker exec $BACKEND_CONTAINER_NAME npm run migration:run || echo "Migrations completed or no migrations to run"
+                  
+                  docker ps | grep $BACKEND_CONTAINER_NAME
+    
+    build-and-deploy-frontend:
+        name: Build and Deploy Frontend
+        runs-on: ubuntu-latest
+        needs: [validate-branch, get-next-port, deploy-backend]
+        if: needs.validate-branch.outputs.branch-exists == 'true'
+        
+        steps:
+            - name: Checkout specific branch
+              uses: actions/checkout@v4
+              with:
+                ref: ${{ github.event.inputs.environment }}
+                
+            - name: Pull frontend image from GHCR
+              run: |
+                BRANCH_NAME="${{ needs.validate-branch.outputs.safe-branch-name }}"
+                IMAGE_NAME="ghcr.io/${{ github.repository }}/frontend:${BRANCH_NAME}"
+                
+                echo "Pulling frontend image: $IMAGE_NAME"
+                echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+                docker pull $IMAGE_NAME
+                
+                # Extraire les fichiers buildés du conteneur
+                docker create --name temp-frontend $IMAGE_NAME
+                docker cp temp-frontend:/usr/share/nginx/html ./dist
+                docker rm temp-frontend
+                
+            - name: Modify config.json for development environment
+              run: |
+                BACKEND_PORT="${{ needs.get-next-port.outputs.backend-port }}"
+                echo '{
+                  "API_BASE_URL": "https://dev-${{ needs.validate-branch.outputs.safe-branch-name }}.budgsmart.yourdomain.com/api"
+                }' > dist/config.json
+                
+                echo "Frontend config updated for development environment"
+                cat dist/config.json
+                
+            - name: Deploy Frontend via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                  BRANCH_NAME="${{ needs.validate-branch.outputs.safe-branch-name }}"
+                  FRONTEND_CONTAINER_NAME="budgsmart-frontend-dev-${BRANCH_NAME}"
+                  NETWORK_NAME="budgsmart-dev-${BRANCH_NAME}"
+                  FRONTEND_PORT="${{ needs.get-next-port.outputs.frontend-port }}"
+                  
+                  echo "Deploying frontend for development environment: $BRANCH_NAME"
+                  
+                  # Arrêter et supprimer le conteneur existant s'il existe
+                  docker stop $FRONTEND_CONTAINER_NAME || true
+                  docker rm $FRONTEND_CONTAINER_NAME || true
+                  
+                  # Créer un volume temporaire pour les fichiers du frontend
+                  docker volume create budgsmart-frontend-dev-${BRANCH_NAME} || true
+                  
+            - name: Copy frontend files to server
+              uses: appleboy/scp-action@v0.1.7
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                source: "dist/*"
+                target: "/tmp/budgsmart-frontend-dev-${{ needs.validate-branch.outputs.safe-branch-name }}/"
+                
+            - name: Start Frontend Container
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                  BRANCH_NAME="${{ needs.validate-branch.outputs.safe-branch-name }}"
+                  FRONTEND_CONTAINER_NAME="budgsmart-frontend-dev-${BRANCH_NAME}"
+                  NETWORK_NAME="budgsmart-dev-${BRANCH_NAME}"
+                  FRONTEND_PORT="${{ needs.get-next-port.outputs.frontend-port }}"
+                  
+                  # Démarrer le conteneur nginx avec les fichiers
+                  docker run -d --name $FRONTEND_CONTAINER_NAME \
+                            --restart=unless-stopped \
+                            --network $NETWORK_NAME \
+                            -p $FRONTEND_PORT:80 \
+                            -v /tmp/budgsmart-frontend-dev-${BRANCH_NAME}/dist:/usr/share/nginx/html:ro \
+                            nginx:alpine
+                  
+                  echo "Frontend container started successfully on port $FRONTEND_PORT"
+                  docker ps | grep $FRONTEND_CONTAINER_NAME
+    
+    summary:
+        name: Deployment Summary
+        runs-on: ubuntu-latest
+        needs: [validate-branch, get-next-port, build-and-deploy-frontend]
+        if: needs.validate-branch.outputs.branch-exists == 'true'
+        
+        steps:
+            - name: Display deployment information
+              run: |
+                echo "🚀 Development environment deployed successfully!"
+                echo ""
+                echo "📋 Environment Details:"
+                echo "  Branch: ${{ github.event.inputs.environment }}"
+                echo "  Environment name: ${{ needs.validate-branch.outputs.safe-branch-name }}"
+                echo ""
+                echo "🌐 Access URLs:"
+                echo "  Frontend: https://dev-${{ needs.validate-branch.outputs.safe-branch-name }}.budgsmart.yourdomain.com"
+                echo "  Backend API: https://dev-${{ needs.validate-branch.outputs.safe-branch-name }}.budgsmart.yourdomain.com/api"
+                echo ""
+                echo "🔧 Container Details:"
+                echo "  Frontend Port: ${{ needs.get-next-port.outputs.frontend-port }}"
+                echo "  Backend Port: ${{ needs.get-next-port.outputs.backend-port }}"
+                echo "  Database Port: ${{ needs.get-next-port.outputs.db-port }}"
+                echo ""
+                echo "🐳 Container Names:"
+                echo "  Frontend: budgsmart-frontend-dev-${{ needs.validate-branch.outputs.safe-branch-name }}"
+                echo "  Backend: budgsmart-backend-dev-${{ needs.validate-branch.outputs.safe-branch-name }}"
+                echo "  Database: budgsmart-db-dev-${{ needs.validate-branch.outputs.safe-branch-name }}"
+                echo "  Network: budgsmart-dev-${{ needs.validate-branch.outputs.safe-branch-name }}"

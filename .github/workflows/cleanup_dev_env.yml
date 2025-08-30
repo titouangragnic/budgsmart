@@ -1,0 +1,125 @@
+name: Cleanup Development Environment
+
+on:
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: 'Environment to cleanup (branch name)'
+                required: true
+                type: string
+            confirm:
+                description: 'Type "DELETE" to confirm cleanup'
+                required: true
+                type: string
+
+jobs:
+    validate-cleanup:
+        name: Validate Cleanup Request
+        runs-on: ubuntu-latest
+        outputs:
+            safe-branch-name: ${{ steps.sanitize.outputs.safe-name }}
+            confirmed: ${{ steps.validate.outputs.confirmed }}
+            
+        steps:
+            - name: Validate confirmation
+              id: validate
+              run: |
+                if [ "${{ github.event.inputs.confirm }}" = "DELETE" ]; then
+                  echo "confirmed=true" >> $GITHUB_OUTPUT
+                  echo "✅ Cleanup confirmed"
+                else
+                  echo "confirmed=false" >> $GITHUB_OUTPUT
+                  echo "❌ Cleanup not confirmed. Please type 'DELETE' to confirm."
+                  exit 1
+                fi
+                
+            - name: Sanitize branch name
+              id: sanitize
+              run: |
+                SAFE_NAME="${{ github.event.inputs.environment }}"
+                SAFE_NAME="${SAFE_NAME//\//-}"  # remplace les / par -
+                SAFE_NAME="${SAFE_NAME//_/-}"   # remplace les _ par -
+                SAFE_NAME="${SAFE_NAME,,}"      # en minuscules
+                echo "safe-name=$SAFE_NAME" >> $GITHUB_OUTPUT
+                echo "Sanitized name: $SAFE_NAME"
+    
+    cleanup-environment:
+        name: Cleanup Development Environment
+        runs-on: ubuntu-latest
+        needs: validate-cleanup
+        if: needs.validate-cleanup.outputs.confirmed == 'true'
+        environment: production
+        
+        steps:
+            - name: Cleanup environment via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                host: ${{ secrets.SSH_HOST }}
+                username: ${{ secrets.SSH_USERNAME }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                  BRANCH_NAME="${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                  
+                  echo "🧹 Cleaning up development environment: $BRANCH_NAME"
+                  
+                  # Noms des conteneurs et réseau
+                  FRONTEND_CONTAINER="budgsmart-frontend-dev-${BRANCH_NAME}"
+                  BACKEND_CONTAINER="budgsmart-backend-dev-${BRANCH_NAME}"
+                  DB_CONTAINER="budgsmart-db-dev-${BRANCH_NAME}"
+                  NETWORK_NAME="budgsmart-dev-${BRANCH_NAME}"
+                  
+                  echo "Stopping and removing containers..."
+                  
+                  # Arrêter et supprimer les conteneurs
+                  docker stop $FRONTEND_CONTAINER || echo "Frontend container not running"
+                  docker rm $FRONTEND_CONTAINER || echo "Frontend container not found"
+                  
+                  docker stop $BACKEND_CONTAINER || echo "Backend container not running"
+                  docker rm $BACKEND_CONTAINER || echo "Backend container not found"
+                  
+                  docker stop $DB_CONTAINER || echo "Database container not running"
+                  docker rm $DB_CONTAINER || echo "Database container not found"
+                  
+                  # Supprimer le réseau
+                  echo "Removing network..."
+                  docker network rm $NETWORK_NAME || echo "Network not found"
+                  
+                  # Nettoyer les volumes temporaires
+                  echo "Cleaning up volumes and temporary files..."
+                  docker volume rm budgsmart-frontend-dev-${BRANCH_NAME} || echo "Frontend volume not found"
+                  rm -rf /tmp/budgsmart-frontend-dev-${BRANCH_NAME} || echo "Temporary files not found"
+                  
+                  # Nettoyer les images non utilisées
+                  echo "Cleaning up unused images..."
+                  docker image prune -f
+                  
+                  echo "✅ Cleanup completed for environment: $BRANCH_NAME"
+                  
+                  # Afficher les conteneurs restants pour vérification
+                  echo "Remaining containers:"
+                  docker ps -a | grep budgsmart || echo "No budgsmart containers found"
+    
+    summary:
+        name: Cleanup Summary
+        runs-on: ubuntu-latest
+        needs: [validate-cleanup, cleanup-environment]
+        if: needs.validate-cleanup.outputs.confirmed == 'true'
+        
+        steps:
+            - name: Display cleanup summary
+              run: |
+                echo "🗑️ Development environment cleanup completed!"
+                echo ""
+                echo "📋 Cleaned up:"
+                echo "  Environment: ${{ github.event.inputs.environment }}"
+                echo "  Sanitized name: ${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                echo ""
+                echo "🐳 Removed containers:"
+                echo "  • budgsmart-frontend-dev-${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                echo "  • budgsmart-backend-dev-${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                echo "  • budgsmart-db-dev-${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                echo ""
+                echo "🌐 Removed network:"
+                echo "  • budgsmart-dev-${{ needs.validate-cleanup.outputs.safe-branch-name }}"
+                echo ""
+                echo "💾 Cleaned up temporary files and volumes"
